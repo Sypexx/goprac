@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 function App() {
   const [data, setData] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
