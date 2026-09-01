@@ -5,12 +5,24 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"demo/app-1/db"
 )
 
 func main() {
+	// Подключение к PostgreSQL (если БД недоступна, приложение упадёт с ошибкой)
+	pool := db.Connect()
+	defer pool.Close()
+
+	if err := db.Migrate(pool); err != nil {
+		log.Fatalf("failed to migrate: %v", err)
+	}
+
 	// API-роуты
 	http.HandleFunc("/api/hello", helloHandler)
 	http.HandleFunc("/api/health", healthHandler)
+	http.HandleFunc("/api/scans", scansHandler(pool))
+	http.HandleFunc("/api/sync", syncHandler(pool))
 
 	// Статика фронтенда
 	distPath := "../frontend/dist"
