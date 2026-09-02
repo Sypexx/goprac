@@ -207,6 +207,9 @@ export default function AdminPanel({ user }: { user: User }) {
       <h2>Панель администратора</h2>
       <p>Добро пожаловать, {user.username}!</p>
 
+      {error && <p className="error">{error}</p>}
+      {notice && <p className="notice">{notice}</p>}
+
       {/* Статистика */}
       <div className="stats-grid">
         <div className="stat-card">
@@ -262,42 +265,65 @@ export default function AdminPanel({ user }: { user: User }) {
           {showAddForm && (
             <div className="add-form">
               <h3>Новый объект</h3>
-              <div className="form-row">
-                <select
-                  value={newType}
-                  onChange={(e) => { setNewType(e.target.value); setNewParent('') }}
-                >
-                  <option value="">Выберите тип</option>
-                  {objectTypes.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-                {parentTypeID && (
+              <div className="form-grid">
+                <div className="field">
+                  <label>Тип объекта</label>
                   <select
-                    value={newParent}
-                    onChange={(e) => setNewParent(e.target.value)}
+                    value={newType}
+                    onChange={(e) => { setNewType(e.target.value); setNewParent('') }}
                   >
-                    <option value="">
-                      {parentCandidates.length > 0
-                        ? `Входит в (${objectTypes.find((t) => t.id === parentTypeID)?.name || ''})`
-                        : `Нет объектов типа "${objectTypes.find((t) => t.id === parentTypeID)?.name}" — сначала создайте`}
-                    </option>
-                    {parentCandidates.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                    <option value="">Выберите тип</option>
+                    {objectTypes.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </select>
+                </div>
+
+                {parentTypeID && (
+                  <div className="field">
+                    <label>
+                      Входит в <span className="field-hint">({objectTypes.find((t) => t.id === parentTypeID)?.name})</span>
+                    </label>
+                    <select
+                      value={newParent}
+                      onChange={(e) => setNewParent(e.target.value)}
+                    >
+                      <option value="">
+                        {parentCandidates.length > 0
+                          ? '— выберите —'
+                          : `нет доступных, сначала создайте`}
+                      </option>
+                      {parentCandidates.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
-                <input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Имя"
-                />
-                <input
-                  value={newEarTag}
-                  onChange={(e) => setNewEarTag(e.target.value)}
-                  placeholder="Бирка (опционально)"
-                />
+
+                <div className="field">
+                  <label>Название</label>
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddObject()}
+                    placeholder="Например: Коровник №3"
+                  />
+                </div>
+
+                <div className="field">
+                  <label>
+                    Бирка <span className="field-hint">(необязательно, для животных)</span>
+                  </label>
+                  <input
+                    value={newEarTag}
+                    onChange={(e) => setNewEarTag(e.target.value)}
+                    placeholder="Например: TAG-123"
+                  />
+                </div>
+              </div>
+              <div className="form-row">
                 <button className="btn-success" onClick={handleAddObject}>Создать</button>
+                <button onClick={() => setShowAddForm(false)}>Отмена</button>
               </div>
             </div>
           )}
@@ -480,9 +506,6 @@ export default function AdminPanel({ user }: { user: User }) {
           </table>
         </>
       )}
-
-      {error && <p className="error">{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
     </div>
   )
 }

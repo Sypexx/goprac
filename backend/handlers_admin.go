@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -106,7 +107,13 @@ func adminObjectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 			id, err := insertObject(r, pool, req.TypeID, req.ParentID, req.Name)
 			if err != nil {
-				http.Error(w, `{"error":"db error: "+err.Error()}`, http.StatusInternalServerError)
+				// 23505 — нарушение UNIQUE (object_type_id, name): такой объект уже есть
+				if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
+					http.Error(w, `{"error":"объект с таким именем уже существует"}`, http.StatusConflict)
+					return
+				}
+				log.Printf("adminObjects POST error: %v", err)
+				http.Error(w, fmt.Sprintf(`{"error":"db error: %v"}`, err), http.StatusInternalServerError)
 				return
 			}
 
