@@ -1,6 +1,0 @@
-2026/09/02 12:59:09 Connected to PostgreSQL
-2026/09/02 12:59:09 Applied schema.sql
-2026/09/02 12:59:09 Applied seed.sql
-2026/09/02 12:59:09 Applied comments.sql
-2026/09/02 12:59:09 Server running on http://localhost:8080
-exit status 1
