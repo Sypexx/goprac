@@ -34,6 +34,9 @@ func main() {
 	mux.Handle("GET /api/admin/objects", authMiddleware(pool)(requireRole("admin")(adminObjectsHandler(pool))))
 	mux.Handle("/api/admin/objects/{id}", authMiddleware(pool)(requireRole("admin")(adminObjectHandler(pool))))
 	mux.Handle("GET /api/admin/users", authMiddleware(pool)(requireRole("admin")(adminUsersHandler(pool))))
+	mux.Handle("POST /api/admin/users", authMiddleware(pool)(requireRole("admin")(adminUsersHandler(pool))))
+	mux.Handle("GET /api/admin/measures", authMiddleware(pool)(requireRole("admin")(measuresAdminHandler(pool))))
+	mux.Handle("POST /api/admin/measures", authMiddleware(pool)(requireRole("admin")(measuresAdminHandler(pool))))
 	mux.Handle("GET /api/reports/measurements", authMiddleware(pool)(requireRole("admin", "zoo")(reportMeasurementsHandler(pool))))
 	mux.Handle("GET /api/reports/summary", authMiddleware(pool)(requireRole("admin", "zoo")(summaryHandler(pool))))
 

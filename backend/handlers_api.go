@@ -11,9 +11,9 @@ import (
 // ---------- Группы (сайдбар) ----------
 
 type group struct {
-	ID           int64  `json:"id"`
-	GroupTypeID  int64  `json:"group_type_id"`
-	Name         string `json:"name"`
+	ID          int64  `json:"id"`
+	GroupTypeID int64  `json:"group_type_id"`
+	Name        string `json:"name"`
 }
 
 func groupsHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -43,11 +43,11 @@ func groupsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 // ---------- Объекты в группе ----------
 
 type object struct {
-	ID        int64  `json:"id"`
-	TypeID    int64  `json:"object_type_id"`
-	TypeName  string `json:"object_type_name"`
-	Name      string `json:"name"`
-	EarTag    string `json:"ear_tag"`
+	ID       int64  `json:"id"`
+	TypeID   int64  `json:"object_type_id"`
+	TypeName string `json:"object_type_name"`
+	Name     string `json:"name"`
+	EarTag   string `json:"ear_tag"`
 }
 
 func objectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -184,12 +184,12 @@ func measureValuesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 type createValueRequest struct {
-	ClientUUID string  `json:"client_uuid"`
-	MeasureID  int64   `json:"measure_id"`
-	ObjectID   int64   `json:"object_id"`
-	Value      float64 `json:"value"`
+	ClientUUID string    `json:"client_uuid"`
+	MeasureID  int64     `json:"measure_id"`
+	ObjectID   int64     `json:"object_id"`
+	Value      float64   `json:"value"`
 	MeasuredAt time.Time `json:"measured_at"`
-	DeviceID   string  `json:"device_id"`
+	DeviceID   string    `json:"device_id"`
 }
 
 // createMeasureValueHandler — одно значение. client_uuid обеспечивает идемпотентность.
@@ -271,15 +271,17 @@ func insertOne(r *http.Request, pool *pgxpool.Pool, v createValueRequest) (bool,
 		v.DeviceID = "unknown"
 	}
 	if v.ClientUUID == "" {
-		// Если клиент не прислал uuid — генерируем (не идемпотентно, но не падаем)
 		v.ClientUUID = newUUID()
 	}
 
+	// Получаем author_id из контекста
+	authorID, _ := r.Context().Value("userId").(int64)
+
 	tag, err := pool.Exec(r.Context(), `
-		INSERT INTO measure_values (client_uuid, measure_id, object_id, value, measured_at, device_id)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO measure_values (client_uuid, measure_id, object_id, value, measured_at, device_id, author_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (client_uuid) DO NOTHING`,
-		v.ClientUUID, v.MeasureID, v.ObjectID, v.Value, v.MeasuredAt, v.DeviceID)
+		v.ClientUUID, v.MeasureID, v.ObjectID, v.Value, v.MeasuredAt, v.DeviceID, authorID)
 	if err != nil {
 		return false, err
 	}

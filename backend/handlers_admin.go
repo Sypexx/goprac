@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ========== Admin: управление объектами ==========
@@ -193,7 +194,7 @@ func adminObjectHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// ========== Admin: управление пользователями ==========
+// ========== Admin: создание пользователей ==========
 
 type adminUser struct {
 	ID        int64  `json:"id"`
@@ -202,10 +203,55 @@ type adminUser struct {
 	CreatedAt string `json:"created_at"`
 }
 
+type createUserRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+}
+
 func adminUsersHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
+		// POST — создание пользователя
+		if r.Method == http.MethodPost {
+			var req createUserRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+				return
+			}
+			if req.Username == "" || req.Password == "" {
+				http.Error(w, `{"error":"username and password required"}`, http.StatusBadRequest)
+				return
+			}
+			if req.Role == "" {
+				req.Role = "user"
+			}
+			if req.Role != "admin" && req.Role != "user" && req.Role != "zoo" {
+				http.Error(w, `{"error":"invalid role"}`, http.StatusBadRequest)
+				return
+			}
+
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+			if err != nil {
+				http.Error(w, `{"error":"password hash error"}`, http.StatusInternalServerError)
+				return
+			}
+
+			_, err = pool.Exec(r.Context(), `
+				INSERT INTO users (name, password, role) VALUES ($1, $2, $3)`,
+				req.Username, string(hashedPassword), req.Role)
+			if err != nil {
+				http.Error(w, `{"error":"db error: "+err.Error()}`, http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]string{"status": "created"})
+			return
+		}
+
+		// GET — список пользователей
 		rows, err := pool.Query(r.Context(), `
 			SELECT id, name, role, TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI')
 			FROM users ORDER BY id`)
