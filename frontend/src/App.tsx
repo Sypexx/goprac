@@ -202,10 +202,15 @@ function AdminPanel({ user }: { user: User }) {
         fetch('/api/reports/summary', { headers }),
       ])
 
-      setObjects(await objectsRes.json())
-      setObjectTypes(await typesRes.json())
-      setUsers(await usersRes.json())
-      setStats(await statsRes.json())
+      const objectsData = await objectsRes.json()
+      const typesData = await typesRes.json()
+      const usersData = await usersRes.json()
+      const statsData = await statsRes.json()
+
+      setObjects(Array.isArray(objectsData) ? objectsData : [])
+      setObjectTypes(Array.isArray(typesData) ? typesData : [])
+      setUsers(Array.isArray(usersData) ? usersData : [])
+      setStats(statsData)
     } catch {
       setError('Ошибка загрузки данных')
     }

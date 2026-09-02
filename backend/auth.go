@@ -53,13 +53,13 @@ func loginHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		// Генерируем простой токен (в продакшене — JWT)
 		token := generateToken(user.ID, user.Name, user.Role)
+		w.Header().Set("X-Auth-Token", token)
 
 		json.NewEncoder(w).Encode(loginResponse{
 			UserID:   user.ID,
 			Username: user.Name,
 			Role:     user.Role,
 		})
-		w.Header().Set("X-Auth-Token", token)
 	}
 }
 
