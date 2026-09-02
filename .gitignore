@@ -29,4 +29,6 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
-backend/.env*.log
+
+# Logs
+*.log
