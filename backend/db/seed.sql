@@ -1,8 +1,9 @@
 -- Тестовые данные (выполняется только на пустой базе)
 
-INSERT INTO users (name, role) VALUES
-    ('Оператор Иван', 'operator'),
-    ('Зоотехник Мария', 'zootechnician')
+INSERT INTO users (name, password, role) VALUES
+    ('admin', '$2a$10$HtosakHzjcio5/8xKo/FMeSkS2iUQBS0eii21EzBhX6F7Yvs98t86', 'admin'),
+    ('user', '$2a$10$OeXvlTRoHVk5xtOFRI7Zye9ABTXgQQcYOxAvdyBfi2wfLTyZ/.XKu', 'user'),
+    ('zoo', '$2a$10$1unYX//wixsZ4XwUcYf3jO7RAFBPyaorxj/B0XYndrd4JRsRP5k36', 'zoo')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO group_types (name) VALUES

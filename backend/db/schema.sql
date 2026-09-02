@@ -2,9 +2,11 @@
 
 -- Пользователи (кто вводит данные)
 CREATE TABLE IF NOT EXISTS users (
-    id    BIGSERIAL PRIMARY KEY,
-    name  TEXT NOT NULL UNIQUE,
-    role  TEXT NOT NULL DEFAULT 'operator'
+    id       BIGSERIAL PRIMARY KEY,
+    name     TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,  -- bcrypt хеш
+    role     TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user', 'zoo')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Справочник типов групп: Склады, Коровники, Отбор животных и т.п.
