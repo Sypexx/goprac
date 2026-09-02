@@ -45,6 +45,48 @@ interface User {
   token: string
 }
 
+interface reportMeasurement {
+  id: number
+  measure_name: string
+  value: number
+  measured_at: string
+  device_id: string
+  author_name: string
+}
+
+interface adminObject {
+  id: number
+  object_type_id: number
+  object_type_name: string
+  name: string
+  ear_tag: string
+  is_active: boolean
+  created_at: string
+}
+
+interface adminUser {
+  id: number
+  name: string
+  role: string
+  created_at: string
+}
+
+interface summaryStats {
+  total_objects: number
+  active_objects: number
+  total_measurements: number
+  today_measurements: number
+}
+
+interface reportMeasurement {
+  id: number
+  measure_name: string
+  value: number
+  measured_at: string
+  device_id: string
+  author_name: string
+}
+
 const QUEUE_KEY = 'offline_queue'
 
 function loadQueue(): QueuedValue[] {
@@ -137,11 +179,223 @@ function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
 
 // ==================== Панель администратора ====================
 function AdminPanel({ user }: { user: User }) {
+  const [objects, setObjects] = useState<adminObject[]>([])
+  const [objectTypes, setObjectTypes] = useState<any[]>([])
+  const [users, setUsers] = useState<adminUser[]>([])
+  const [stats, setStats] = useState<summaryStats | null>(null)
+  const [selectedType, setSelectedType] = useState<string>('')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState('')
+  const [newEarTag, setNewEarTag] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const headers = { 'Content-Type': 'application/json', 'X-Auth-Token': user.token }
+
+  const loadData = useCallback(async () => {
+    try {
+      const [objectsRes, typesRes, usersRes, statsRes] = await Promise.all([
+        fetch(`/api/admin/objects${selectedType ? `?type_id=${selectedType}` : ''}`, { headers }),
+        fetch('/api/object-types', { headers }),
+        fetch('/api/admin/users', { headers }),
+        fetch('/api/reports/summary', { headers }),
+      ])
+
+      setObjects(await objectsRes.json())
+      setObjectTypes(await typesRes.json())
+      setUsers(await usersRes.json())
+      setStats(await statsRes.json())
+    } catch {
+      setError('Ошибка загрузки данных')
+    }
+  }, [headers, selectedType])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const handleAddObject = async () => {
+    if (!newName || !newType) {
+      setError('Заполните имя и тип')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/admin/objects', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          type_id: parseInt(newType),
+          name: newName,
+          ear_tag: newEarTag,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Ошибка создания')
+      }
+
+      setNotice(`Объект создан`)
+      setNewName('')
+      setNewEarTag('')
+      setShowAddForm(false)
+      loadData()
+    } catch (err: any) {
+      setError(err.message || 'Ошибка создания объекта')
+    }
+  }
+
+  const handleArchive = async (id: number) => {
+    if (!confirm('Архивировать объект?')) return
+
+    try {
+      const res = await fetch(`/api/admin/objects/${id}`, {
+        method: 'DELETE',
+        headers,
+      })
+
+      if (!res.ok) throw new Error('Ошибка архивирования')
+
+      setNotice('Объект архивирован')
+      loadData()
+    } catch (err: any) {
+      setError(err.message || 'Ошибка архивирования')
+    }
+  }
+
   return (
     <div className="panel">
       <h2>Панель администратора</h2>
       <p>Добро пожаловать, {user.username}!</p>
-      <p>Здесь будет управление объектами, справочниками и пользователями.</p>
+
+      {/* Статистика */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-value">{stats?.total_objects || 0}</div>
+          <div className="stat-label">Всего объектов</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.active_objects || 0}</div>
+          <div className="stat-label">Активных</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.total_measurements || 0}</div>
+          <div className="stat-label">Измерений</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{stats?.today_measurements || 0}</div>
+          <div className="stat-label">Сегодня</div>
+        </div>
+      </div>
+
+      {/* Фильтр по типу */}
+      <div className="filter-bar">
+        <select
+          value={selectedType}
+          onChange={(e) => setSelectedType(e.target.value)}
+        >
+          <option value="">Все типы</option>
+          {objectTypes.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <button onClick={() => setShowAddForm(!showAddForm)}>
+          {showAddForm ? 'Отмена' : '+ Добавить объект'}
+        </button>
+      </div>
+
+      {/* Форма добавления */}
+      {showAddForm && (
+        <div className="add-form">
+          <h3>Новый объект</h3>
+          <div className="form-row">
+            <select
+              value={newType}
+              onChange={(e) => setNewType(e.target.value)}
+            >
+              <option value="">Выберите тип</option>
+              {objectTypes.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Имя"
+            />
+            <input
+              value={newEarTag}
+              onChange={(e) => setNewEarTag(e.target.value)}
+              placeholder="Бирка (опционально)"
+            />
+            <button className="btn-success" onClick={handleAddObject}>Создать</button>
+          </div>
+        </div>
+      )}
+
+      {/* Таблица объектов */}
+      <table>
+        <thead>
+          <tr>
+            <th>Имя</th>
+            <th>Тип</th>
+            <th>Бирка</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {objects.map((o) => (
+            <tr key={o.id}>
+              <td>{o.name}</td>
+              <td>{o.object_type_name}</td>
+              <td>{o.ear_tag || '—'}</td>
+              <td>
+                <span className={`status-badge ${o.is_active ? 'active' : 'inactive'}`}>
+                  {o.is_active ? 'Активен' : 'Архив'}
+                </span>
+              </td>
+              <td>
+                {!o.is_active && (
+                  <button className="btn-danger btn-small" onClick={() => handleArchive(o.id)}>
+                    Удалить
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Таблица пользователей */}
+      <h3>Пользователи</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Имя</th>
+            <th>Роль</th>
+            <th>Создан</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((u) => (
+            <tr key={u.id}>
+              <td>{u.id}</td>
+              <td>{u.name}</td>
+              <td>
+                <span className={`role-badge ${u.role}`}>
+                  {u.role === 'admin' ? 'Админ' : u.role === 'zoo' ? 'Зоотехник' : 'Пользователь'}
+                </span>
+              </td>
+              <td>{u.created_at}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {error && <p className="error">{error}</p>}
+      {notice && <p className="notice">{notice}</p>}
     </div>
   )
 }
@@ -403,11 +657,157 @@ function UserPanel({ user }: { user: User }) {
 
 // ==================== Панель зоотехника ====================
 function ZooPanel({ user }: { user: User }) {
+  const [objects, setObjects] = useState<Animal[]>([])
+  const [selectedObject, setSelectedObject] = useState<Animal | null>(null)
+  const [measures, setMeasures] = useState<Measure[]>([])
+  const [selectedMeasure, setSelectedMeasure] = useState<number | null>(null)
+  const [measurements, setMeasurements] = useState<reportMeasurement[]>([])
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const headers = { 'Content-Type': 'application/json', 'X-Auth-Token': user.token }
+
+  const loadObjects = useCallback(async () => {
+    try {
+      const res = await fetch('/api/objects?group_id=1', { headers })
+      setObjects(await res.json())
+    } catch {
+      setError('Ошибка загрузки объектов')
+    }
+  }, [headers])
+
+  useEffect(() => { loadObjects() }, [loadObjects])
+
+  const loadMeasurements = useCallback(async () => {
+    if (!selectedObject || !selectedMeasure) return
+
+    try {
+      const params = new URLSearchParams({
+        object_id: selectedObject.id.toString(),
+        measure_id: selectedMeasure.toString(),
+      })
+      if (from) params.append('from', from)
+      if (to) params.append('to', to)
+
+      const res = await fetch(`/api/reports/measurements?${params}`, { headers })
+      setMeasurements(await res.json())
+    } catch {
+      setError('Ошибка загрузки измерений')
+    }
+  }, [headers, selectedObject, selectedMeasure, from, to])
+
+  useEffect(() => { loadMeasurements() }, [loadMeasurements])
+
+  // Загрузка показателей для выбранного объекта
+  useEffect(() => {
+    if (!selectedObject) {
+      setMeasures([])
+      setSelectedMeasure(null)
+      setMeasurements([])
+      return
+    }
+
+    fetch(`/api/measures?object_type_id=${selectedObject.object_type_id}`, { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        setMeasures(data)
+        if (data.length > 0) setSelectedMeasure(data[0].id)
+      })
+      .catch(() => setError('Ошибка загрузки показателей'))
+  }, [selectedObject, headers])
+
   return (
     <div className="panel">
       <h2>Панель зоотехника</h2>
       <p>Добро пожаловать, {user.username}!</p>
-      <p>Здесь будут отчёты и аналитика.</p>
+
+      {/* Выбор объекта */}
+      <div className="form-group">
+        <label>Объект</label>
+        <select
+          value={selectedObject?.id || ''}
+          onChange={(e) => {
+            const obj = objects.find(o => o.id === parseInt(e.target.value))
+            setSelectedObject(obj || null)
+          }}
+        >
+          <option value="">Выберите объект</option>
+          {objects.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.name} ({o.ear_tag})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Выбор показателя */}
+      {selectedObject && measures.length > 0 && (
+        <div className="form-group">
+          <label>Показатель</label>
+          <select
+            value={selectedMeasure || ''}
+            onChange={(e) => setSelectedMeasure(Number(e.target.value))}
+          >
+            {measures.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} ({m.unit})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Фильтр по периоду */}
+      {selectedObject && (
+        <div className="form-row">
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            placeholder="С"
+          />
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            placeholder="По"
+          />
+        </div>
+      )}
+
+      {/* Таблица измерений */}
+      {selectedObject && measurements.length > 0 && (
+        <>
+          <h3>История измерений</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Значение</th>
+                <th>Время</th>
+                <th>Устройство</th>
+                <th>Автор</th>
+              </tr>
+            </thead>
+            <tbody>
+              {measurements.map((v) => (
+                <tr key={v.id}>
+                  <td>{v.value} {measures.find(m => m.id === selectedMeasure)?.unit}</td>
+                  <td>{new Date(v.measured_at).toLocaleString('ru-RU')}</td>
+                  <td>{v.device_id}</td>
+                  <td>{v.author_name || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {selectedObject && measurements.length === 0 && (
+        <p>Измерений не найдено</p>
+      )}
+
+      {error && <p className="error">{error}</p>}
     </div>
   )
 }

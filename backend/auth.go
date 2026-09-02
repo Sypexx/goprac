@@ -123,3 +123,21 @@ func requireRole(roles ...string) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+// getUserId — извлекает userId из контекста.
+func getUserId(r *http.Request) int64 {
+	val := r.Context().Value("userId")
+	if val == nil {
+		return 0
+	}
+	return val.(int64)
+}
+
+// getRole — извлекает роль из контекста.
+func getRole(r *http.Request) string {
+	val := r.Context().Value("role")
+	if val == nil {
+		return ""
+	}
+	return val.(string)
+}

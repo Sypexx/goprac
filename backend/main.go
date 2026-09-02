@@ -23,6 +23,34 @@ func main() {
 	mux.HandleFunc("GET /api/health", healthHandler)
 	mux.HandleFunc("POST /api/login", loginHandler(pool))
 
+	// Авторизованные роуты (через middleware)
+	authRouter := http.NewServeMux()
+
+	// Группы, объекты, показатели — для всех авторизованных
+	authRouter.Handle("GET /api/groups", authMiddleware(pool)(groupsHandler(pool)))
+	authRouter.Handle("GET /api/objects", authMiddleware(pool)(objectsHandler(pool)))
+	authRouter.Handle("GET /api/measures", authMiddleware(pool)(measuresHandler(pool)))
+	authRouter.Handle("GET /api/measure-values", authMiddleware(pool)(measureValuesHandler(pool)))
+	authRouter.Handle("POST /api/measure-values", authMiddleware(pool)(createMeasureValueHandler(pool)))
+	authRouter.Handle("POST /api/sync", authMiddleware(pool)(syncHandler(pool)))
+	authRouter.Handle("GET /api/object-types", authMiddleware(pool)(objectTypesHandler(pool)))
+
+	// Админка — только для admin
+	adminRouter := http.NewServeMux()
+	adminRouter.Handle("GET /api/admin/objects", authMiddleware(pool)(requireRole("admin")(adminObjectsHandler(pool))))
+	adminRouter.Handle("/api/admin/objects/{id}", authMiddleware(pool)(requireRole("admin")(adminObjectHandler(pool))))
+	adminRouter.Handle("GET /api/admin/users", authMiddleware(pool)(requireRole("admin")(adminUsersHandler(pool))))
+
+	// Зоотехник — для admin и zoo
+	zooRouter := http.NewServeMux()
+	zooRouter.Handle("GET /api/reports/measurements", authMiddleware(pool)(requireRole("admin", "zoo")(reportMeasurementsHandler(pool))))
+	zooRouter.Handle("GET /api/reports/summary", authMiddleware(pool)(requireRole("admin", "zoo")(summaryHandler(pool))))
+
+	// Подключаем маршруты
+	mux.Handle("/api/auth/", authRouter)
+	mux.Handle("/api/admin/", adminRouter)
+	mux.Handle("/api/reports/", zooRouter)
+
 	// Статика фронтенда
 	distPath := "../frontend/dist"
 	if _, err := os.Stat(distPath); os.IsNotExist(err) {
