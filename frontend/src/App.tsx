@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from 'react'
 
-interface Group {
-  id: number
-  group_type_id: number
-  name: string
-}
-
 interface Animal {
   id: number
   object_type_id: number
@@ -78,15 +72,6 @@ interface summaryStats {
   active_objects: number
   total_measurements: number
   today_measurements: number
-}
-
-interface reportMeasurement {
-  id: number
-  measure_name: string
-  value: number
-  measured_at: string
-  device_id: string
-  author_name: string
 }
 
 const QUEUE_KEY = 'offline_queue'
@@ -219,6 +204,7 @@ function AdminPanel({ user }: { user: User }) {
   const [newMeasureUnit, setNewMeasureUnit] = useState('')
   const [newMeasureType, setNewMeasureType] = useState('instant')
   const [selectedTypes, setSelectedTypes] = useState<number[]>([])
+  const [tab, setTab] = useState<'objects' | 'users' | 'measures'>('objects')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -421,27 +407,36 @@ function AdminPanel({ user }: { user: User }) {
         </div>
       </div>
 
-      {/* Фильтр по типу */}
-      <div className="filter-bar">
-        <select
-          value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
-        >
-          <option value="">Все типы</option>
-          {objectTypes.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-        <button onClick={() => setShowAddForm(!showAddForm)}>
-          {showAddForm ? 'Отмена' : '+ Добавить объект'}
+      {/* Вкладки */}
+      <div className="tabs">
+        <button className={`tab ${tab === 'objects' ? 'active' : ''}`} onClick={() => setTab('objects')}>
+          Объекты ({objects.length})
         </button>
-        <button onClick={() => setShowUserForm(!showUserForm)}>
-          {showUserForm ? 'Отмена' : '+ Добавить пользователя'}
+        <button className={`tab ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>
+          Пользователи ({users.length})
         </button>
-        <button onClick={() => setShowMeasureForm(!showMeasureForm)}>
-          {showMeasureForm ? 'Отмена' : '+ Добавить показатель'}
+        <button className={`tab ${tab === 'measures' ? 'active' : ''}`} onClick={() => setTab('measures')}>
+          Показатели ({measures.length})
         </button>
       </div>
+
+      {/* ===== Вкладка: Объекты ===== */}
+      {tab === 'objects' && (
+        <>
+          <div className="filter-bar">
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+            >
+              <option value="">Все типы</option>
+              {objectTypes.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <button onClick={() => setShowAddForm(!showAddForm)}>
+              {showAddForm ? 'Отмена' : '+ Добавить объект'}
+            </button>
+          </div>
 
        {/* Форма добавления */}
        {showAddForm && (
@@ -483,80 +478,9 @@ function AdminPanel({ user }: { user: User }) {
                placeholder="Бирка (опционально)"
              />
              <button className="btn-success" onClick={handleAddObject}>Создать</button>
-           </div>
-         </div>
-       )}
-
-       {/* Форма добавления пользователя */}
-       {showUserForm && (
-         <div className="add-form">
-           <h3>Новый пользователь</h3>
-           <div className="form-row">
-             <input
-               value={newUsername}
-               onChange={(e) => setNewUsername(e.target.value)}
-               placeholder="Логин"
-             />
-             <input
-               value={newPassword}
-               onChange={(e) => setNewPassword(e.target.value)}
-               placeholder="Пароль"
-               type="password"
-             />
-             <select
-               value={newRole}
-               onChange={(e) => setNewRole(e.target.value)}
-             >
-               <option value="user">Пользователь</option>
-               <option value="admin">Админ</option>
-               <option value="zoo">Зоотехник</option>
-             </select>
-             <button className="btn-success" onClick={handleCreateUser}>Создать</button>
-           </div>
-         </div>
-       )}
-
-       {/* Форма добавления показателя */}
-       {showMeasureForm && (
-         <div className="add-form">
-           <h3>Новый показатель</h3>
-           <div className="form-row">
-             <input
-               value={newMeasureName}
-               onChange={(e) => setNewMeasureName(e.target.value)}
-               placeholder="Название (например: Рост)"
-             />
-             <input
-               value={newMeasureUnit}
-               onChange={(e) => setNewMeasureUnit(e.target.value)}
-               placeholder="Единица (например: см)"
-             />
-             <select
-               value={newMeasureType}
-               onChange={(e) => setNewMeasureType(e.target.value)}
-             >
-               <option value="instant">Мгновенное значение</option>
-               <option value="balance">Накопительное</option>
-             </select>
-           </div>
-           <div className="form-row" style={{marginTop: '8px'}}>
-             <span style={{fontSize: '14px', marginRight: '8px'}}>Применить к типам:</span>
-             {objectTypes.map((t) => (
-               <label key={t.id} style={{marginRight: '12px', fontSize: '14px'}}>
-                 <input
-                   type="checkbox"
-                   checked={selectedTypes.includes(t.id)}
-                   onChange={() => toggleTypeSelection(t.id)}
-                 />
-                 {t.name}
-               </label>
-             ))}
-           </div>
-           <div className="form-row" style={{marginTop: '8px'}}>
-             <button className="btn-success" onClick={handleCreateMeasure}>Создать</button>
-           </div>
-         </div>
-       )}
+            </div>
+          </div>
+        )}
 
       {/* Таблица объектов */}
       <table>
@@ -593,58 +517,149 @@ function AdminPanel({ user }: { user: User }) {
           ))}
         </tbody>
       </table>
+        </>
+      )}
 
-      {/* Таблица пользователей */}
-      <h3>Пользователи</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Имя</th>
-            <th>Роль</th>
-            <th>Создан</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.id}>
-              <td>{u.id}</td>
-              <td>{u.name}</td>
-              <td>
-                <span className={`role-badge ${u.role}`}>
-                  {u.role === 'admin' ? 'Админ' : u.role === 'zoo' ? 'Зоотехник' : 'Пользователь'}
-                </span>
-              </td>
-              <td>{u.created_at}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* ===== Вкладка: Пользователи ===== */}
+      {tab === 'users' && (
+        <>
+          <div className="filter-bar">
+            <button onClick={() => setShowUserForm(!showUserForm)}>
+              {showUserForm ? 'Отмена' : '+ Добавить пользователя'}
+            </button>
+          </div>
 
-      {/* Таблица показателей */}
-      <h3>Показатели</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Название</th>
-            <th>Тип данных</th>
-            <th>Единица</th>
-            <th>Тип</th>
-          </tr>
-        </thead>
-        <tbody>
-          {measures.map((m) => (
-            <tr key={m.id}>
-              <td>{m.id}</td>
-              <td>{m.name}</td>
-              <td>{m.data_type}</td>
-              <td>{m.unit || '—'}</td>
-              <td>{m.measure_type === 'instant' ? 'Мгновенный' : 'Накопительный'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          {/* Форма добавления пользователя */}
+          {showUserForm && (
+            <div className="add-form">
+              <h3>Новый пользователь</h3>
+              <div className="form-row">
+                <input
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  placeholder="Логин"
+                />
+                <input
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Пароль"
+                  type="password"
+                />
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                >
+                  <option value="user">Пользователь</option>
+                  <option value="admin">Админ</option>
+                  <option value="zoo">Зоотехник</option>
+                </select>
+                <button className="btn-success" onClick={handleCreateUser}>Создать</button>
+              </div>
+            </div>
+          )}
+
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Имя</th>
+                <th>Роль</th>
+                <th>Создан</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.id}</td>
+                  <td>{u.name}</td>
+                  <td>
+                    <span className={`role-badge ${u.role}`}>
+                      {u.role === 'admin' ? 'Админ' : u.role === 'zoo' ? 'Зоотехник' : 'Пользователь'}
+                    </span>
+                  </td>
+                  <td>{u.created_at}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {/* ===== Вкладка: Показатели ===== */}
+      {tab === 'measures' && (
+        <>
+          <div className="filter-bar">
+            <button onClick={() => setShowMeasureForm(!showMeasureForm)}>
+              {showMeasureForm ? 'Отмена' : '+ Добавить показатель'}
+            </button>
+          </div>
+
+          {/* Форма добавления показателя */}
+          {showMeasureForm && (
+            <div className="add-form">
+              <h3>Новый показатель</h3>
+              <div className="form-row">
+                <input
+                  value={newMeasureName}
+                  onChange={(e) => setNewMeasureName(e.target.value)}
+                  placeholder="Название (например: Рост)"
+                />
+                <input
+                  value={newMeasureUnit}
+                  onChange={(e) => setNewMeasureUnit(e.target.value)}
+                  placeholder="Единица (например: см)"
+                />
+                <select
+                  value={newMeasureType}
+                  onChange={(e) => setNewMeasureType(e.target.value)}
+                >
+                  <option value="instant">Мгновенное значение</option>
+                  <option value="balance">Накопительное</option>
+                </select>
+              </div>
+              <div className="form-row" style={{marginTop: '8px'}}>
+                <span style={{fontSize: '14px', marginRight: '8px'}}>Применить к типам:</span>
+                {objectTypes.map((t) => (
+                  <label key={t.id} style={{marginRight: '12px', fontSize: '14px'}}>
+                    <input
+                      type="checkbox"
+                      checked={selectedTypes.includes(t.id)}
+                      onChange={() => toggleTypeSelection(t.id)}
+                    />
+                    {t.name}
+                  </label>
+                ))}
+              </div>
+              <div className="form-row" style={{marginTop: '8px'}}>
+                <button className="btn-success" onClick={handleCreateMeasure}>Создать</button>
+              </div>
+            </div>
+          )}
+
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>Тип данных</th>
+                <th>Единица</th>
+                <th>Тип</th>
+              </tr>
+            </thead>
+            <tbody>
+              {measures.map((m) => (
+                <tr key={m.id}>
+                  <td>{m.id}</td>
+                  <td>{m.name}</td>
+                  <td>{m.data_type}</td>
+                  <td>{m.unit || '—'}</td>
+                  <td>{m.measure_type === 'instant' ? 'Мгновенный' : 'Накопительный'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
 
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -653,11 +668,15 @@ function AdminPanel({ user }: { user: User }) {
 }
 
 // ==================== Панель пользователя ====================
+interface TreeNode extends Animal {
+  parent_id: number | null
+  parent_name: string
+}
+
 function UserPanel({ user }: { user: User }) {
-  const [groups, setGroups] = useState<Group[]>([])
-  const [selectedGroup, setSelectedGroup] = useState<number | null>(null)
-  const [animals, setAnimals] = useState<Animal[]>([])
-  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null)
+  const [nodes, setNodes] = useState<TreeNode[]>([])
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [measures, setMeasures] = useState<Measure[]>([])
   const [measureId, setMeasureId] = useState<number | null>(null)
   const [value, setValue] = useState('')
@@ -668,6 +687,28 @@ function UserPanel({ user }: { user: User }) {
   const [notice, setNotice] = useState<string | null>(null)
 
   const headers = useMemo(() => ({ 'Content-Type': 'application/json', 'X-Auth-Token': user.token }), [user.token])
+
+  const selected = nodes.find((n) => n.id === selectedId) || null
+  const childrenOf = useMemo(() => {
+    const map = new Map<number | null, TreeNode[]>()
+    for (const n of nodes) {
+      const key = n.parent_id ?? null
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(n)
+    }
+    return map
+  }, [nodes])
+
+  // Хлебные крошки: путь от корня до выбранного объекта
+  const breadcrumb = useMemo(() => {
+    const path: TreeNode[] = []
+    let cur = selected
+    while (cur) {
+      path.unshift(cur)
+      cur = cur.parent_id ? nodes.find((n) => n.id === cur!.parent_id) || null : null
+    }
+    return path
+  }, [selected, nodes])
 
   // Онлайн/оффлайн статус
   useEffect(() => {
@@ -681,47 +722,45 @@ function UserPanel({ user }: { user: User }) {
     }
   }, [])
 
-  const loadGroups = useCallback(async () => {
+  // Загрузка всего дерева объектов
+  const loadTree = useCallback(async () => {
     try {
-      const res = await fetch('/api/groups', { headers })
+      const res = await fetch('/api/objects', { headers })
       const data = await res.json()
-      setGroups(data)
-      if (data.length > 0) setSelectedGroup(data[0].id)
+      const list: TreeNode[] = Array.isArray(data) ? data : []
+      setNodes(list)
+      // Раскрываем корневые узлы (организации)
+      setExpanded(new Set(list.filter((n) => n.parent_id == null).map((n) => n.id)))
     } catch {
       setError('Нет связи с сервером')
     }
   }, [headers])
 
-  useEffect(() => { loadGroups() }, [loadGroups])
+  useEffect(() => { loadTree() }, [loadTree])
 
+  // Показатели для выбранного объекта
   useEffect(() => {
-    if (selectedGroup == null) return
-    fetch(`/api/objects?group_id=${selectedGroup}`, { headers })
-      .then((r) => r.json())
-      .then(setAnimals)
-      .catch(() => setError('Ошибка загрузки объектов'))
-  }, [selectedGroup, headers])
-
-  useEffect(() => {
-    if (!selectedAnimal) { setMeasures([]); return }
-    fetch(`/api/measures?object_type_id=${selectedAnimal.object_type_id}`, { headers })
+    if (!selected) { setMeasures([]); setMeasureId(null); return }
+    fetch(`/api/measures?object_type_id=${selected.object_type_id}`, { headers })
       .then((r) => r.json())
       .then((data) => {
-        setMeasures(data)
-        if (data.length > 0) setMeasureId(data[0].id)
+        const list: Measure[] = Array.isArray(data) ? data : []
+        setMeasures(list)
+        setMeasureId(list.length > 0 ? list[0].id : null)
       })
       .catch(() => setError('Ошибка загрузки показателей'))
-  }, [selectedAnimal, headers])
+  }, [selected, headers])
 
   const loadValues = useCallback(async () => {
-    if (!selectedAnimal) { setValues([]); return }
+    if (!selected) { setValues([]); return }
     try {
-      const res = await fetch(`/api/measure-values?object_id=${selectedAnimal.id}`, { headers })
-      setValues(await res.json())
+      const res = await fetch(`/api/measure-values?object_id=${selected.id}`, { headers })
+      const data = await res.json()
+      setValues(Array.isArray(data) ? data : [])
     } catch {
       // оффлайн
     }
-  }, [selectedAnimal, headers])
+  }, [selected, headers])
 
   useEffect(() => { loadValues() }, [loadValues])
 
@@ -750,7 +789,7 @@ function UserPanel({ user }: { user: User }) {
   }, [online, syncQueue])
 
   const submitValue = async () => {
-    if (!selectedAnimal || measureId == null || !value.trim()) return
+    if (!selected || measureId == null || !value.trim()) return
     const num = parseFloat(value)
     if (isNaN(num)) {
       setError('Введите число')
@@ -760,7 +799,7 @@ function UserPanel({ user }: { user: User }) {
     const entry: QueuedValue = {
       client_uuid: genUUID(),
       measure_id: measureId,
-      object_id: selectedAnimal.id,
+      object_id: selected.id,
       value: num,
       measured_at: new Date().toISOString(),
       device_id: 'web-ui',
@@ -798,19 +837,52 @@ function UserPanel({ user }: { user: User }) {
     }
   }
 
+  const toggleExpand = (id: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // Рекурсивный узел дерева
+  const renderNode = (node: TreeNode, depth: number): React.ReactNode => {
+    const kids = childrenOf.get(node.id) || []
+    const isOpen = expanded.has(node.id)
+    const isSelected = node.id === selectedId
+    return (
+      <div key={node.id}>
+        <div
+          className={`tree-item ${isSelected ? 'active' : ''}`}
+          style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          onClick={() => { setSelectedId(node.id); setNotice(null); setError(null) }}
+        >
+          {kids.length > 0 ? (
+            <span
+              className="tree-arrow"
+              onClick={(e) => { e.stopPropagation(); toggleExpand(node.id) }}
+            >
+              {isOpen ? '▾' : '▸'}
+            </span>
+          ) : (
+            <span className="tree-arrow">·</span>
+          )}
+          <span className="tree-name">{node.name}</span>
+          {node.ear_tag && <span className="tag">{node.ear_tag}</span>}
+        </div>
+        {isOpen && kids.map((k) => renderNode(k, depth + 1))}
+      </div>
+    )
+  }
+
+  const kids = selected ? childrenOf.get(selected.id) || [] : []
+
   return (
     <div className="layout">
-      <aside>
-        <h2>Группы</h2>
-        {groups.map((g) => (
-          <div
-            key={g.id}
-            className={`group-item ${g.id === selectedGroup ? 'active' : ''}`}
-            onClick={() => { setSelectedGroup(g.id); setSelectedAnimal(null) }}
-          >
-            {g.name}
-          </div>
-        ))}
+      <aside className="tree-sidebar">
+        <h2>Организации</h2>
+        {(childrenOf.get(null) || []).map((n) => renderNode(n, 0))}
       </aside>
 
       <main>
@@ -827,84 +899,103 @@ function UserPanel({ user }: { user: User }) {
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
 
-        {!selectedAnimal && (
+        {!selected && (
           <>
-            <h1>Объекты</h1>
-            {animals.length === 0 && <p>Пусто</p>}
-            <table>
-              <thead>
-                <tr>
-                  <th>Имя</th>
-                  <th>Тип</th>
-                  <th>Бирка</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {animals.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.name}</td>
-                    <td>{a.object_type_name}</td>
-                    <td>{a.ear_tag}</td>
-                    <td>
-                      <button onClick={() => setSelectedAnimal(a)}>Открыть</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h1>Выберите объект</h1>
+            <p className="hint">Слева — дерево организаций. Раскрывайте узлы и выбирайте коровник или животное.</p>
           </>
         )}
 
-        {selectedAnimal && (
+        {selected && (
           <>
-            <button className="small" onClick={() => setSelectedAnimal(null)}>← Назад</button>
-            <h1>{selectedAnimal.name} <span className="tag">{selectedAnimal.ear_tag}</span></h1>
-
-            <div className="form">
-              <select
-                value={measureId ?? ''}
-                onChange={(e) => setMeasureId(Number(e.target.value))}
-              >
-                {measures.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.unit})
-                  </option>
-                ))}
-              </select>
-              <input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submitValue()}
-                placeholder="Значение"
-                type="number"
-                step="any"
-              />
-              <button onClick={submitValue}>Сохранить</button>
+            {/* Хлебные крошки */}
+            <div className="breadcrumb">
+              {breadcrumb.map((b, i) => (
+                <span key={b.id}>
+                  {i > 0 && <span className="crumb-sep"> / </span>}
+                  <span
+                    className={`crumb ${b.id === selected.id ? 'current' : 'link'}`}
+                    onClick={() => b.id !== selected.id && setSelectedId(b.id)}
+                  >
+                    {b.name}
+                  </span>
+                </span>
+              ))}
             </div>
 
+            <h1>
+              {selected.name}
+              <span className="type-chip">{selected.object_type_name}</span>
+              {selected.ear_tag && <span className="tag">{selected.ear_tag}</span>}
+            </h1>
+
+            {/* Ввод измерения */}
+            {measures.length > 0 ? (
+              <div className="form">
+                <select
+                  value={measureId ?? ''}
+                  onChange={(e) => setMeasureId(Number(e.target.value))}
+                >
+                  {measures.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.unit})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitValue()}
+                  placeholder="Значение"
+                  type="number"
+                  step="any"
+                />
+                <button onClick={submitValue}>Сохранить</button>
+              </div>
+            ) : (
+              <p className="hint">Для этого объекта нет показателей</p>
+            )}
+
+            {/* Дочерние объекты */}
+            {kids.length > 0 && (
+              <>
+                <h2>Содержит ({kids.length})</h2>
+                <div className="child-grid">
+                  {kids.map((k) => (
+                    <div key={k.id} className="child-card" onClick={() => setSelectedId(k.id)}>
+                      <div className="child-name">{k.name}</div>
+                      <div className="child-meta">{k.object_type_name}{k.ear_tag ? ` · ${k.ear_tag}` : ''}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* История измерений */}
             <h2>История измерений</h2>
-            {values.length === 0 && <p>Измерений пока нет</p>}
-            <table>
-              <thead>
-                <tr>
-                  <th>Показатель</th>
-                  <th>Значение</th>
-                  <th>Время</th>
-                  <th>Устройство</th>
-                </tr>
-              </thead>
-              <tbody>
-                {values.map((v) => (
-                  <tr key={v.id}>
-                    <td>{v.measure_name}</td>
-                    <td>{v.value} {v.unit}</td>
-                    <td>{new Date(v.measured_at).toLocaleString('ru-RU')}</td>
-                    <td>{v.device_id}</td>
+            {values.length === 0 && <p className="hint">Измерений пока нет</p>}
+            {values.length > 0 && (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Показатель</th>
+                    <th>Значение</th>
+                    <th>Время</th>
+                    <th>Устройство</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {values.map((v) => (
+                    <tr key={v.id}>
+                      <td>{v.measure_name}</td>
+                      <td>{v.value} {v.unit}</td>
+                      <td>{new Date(v.measured_at).toLocaleString('ru-RU')}</td>
+                      <td>{v.device_id}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </>
         )}
       </main>

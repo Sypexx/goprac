@@ -60,20 +60,33 @@ SELECT ot.id, g.name FROM object_types ot, groups g
 WHERE ot.name = 'Коровник' AND g.name IN ('Коровник №1', 'Коровник №2')
 ON CONFLICT (object_type_id, name) DO NOTHING;
 
--- Пример иерархии: организация → строение → коровники
+-- Пример иерархии: три организации → строение → коровники → животные
 INSERT INTO objects (object_type_id, name)
-SELECT ot.id, 'ООО Агро' FROM object_types ot WHERE ot.name = 'Организация'
+SELECT ot.id, x.name FROM object_types ot, (VALUES
+    ('АО Агрохолдинг'),
+    ('ООО Новый'),
+    ('ООО Хатасский Свинокомплекс')
+) AS x(name)
+WHERE ot.name = 'Организация'
 ON CONFLICT (object_type_id, name) DO NOTHING;
 
+-- Строение под первой организацией
 INSERT INTO objects (object_type_id, parent_id, name)
 SELECT ot.id, org.id, 'Главный корпус'
 FROM object_types ot
-CROSS JOIN (SELECT id FROM objects WHERE object_type_id = (SELECT id FROM object_types WHERE name = 'Организация') AND name = 'ООО Агро') org
+CROSS JOIN (SELECT id FROM objects WHERE object_type_id = (SELECT id FROM object_types WHERE name = 'Организация') AND name = 'АО Агрохолдинг') org
 WHERE ot.name = 'Строение'
 ON CONFLICT (object_type_id, name) DO NOTHING;
 
 UPDATE objects SET parent_id = (SELECT id FROM objects WHERE name = 'Главный корпус' AND object_type_id = (SELECT id FROM object_types WHERE name = 'Строение'))
 WHERE name IN ('Коровник №1', 'Коровник №2') AND parent_id IS NULL;
+
+-- Животные живут в Коровнике №1 (иерархия parent_id)
+UPDATE objects SET parent_id = (
+    SELECT o2.id FROM objects o2
+    JOIN object_types ot ON ot.id = o2.object_type_id
+    WHERE o2.name = 'Коровник №1' AND ot.name = 'Коровник')
+WHERE name IN ('Зорька', 'Бурёнка', 'Милка') AND parent_id IS NULL;
 
 -- Животные в коровнике №1
 INSERT INTO objects (object_type_id, name)

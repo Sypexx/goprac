@@ -423,3 +423,144 @@ button.btn-small {
   background: #64ff64;
   color: #000;
 }
+
+/* ==================== Вкладки админки ==================== */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #333;
+  margin-bottom: 1rem;
+}
+
+.tabs .tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: #888;
+  padding: 0.5em 1.2em;
+  margin: 0;
+}
+
+.tabs .tab:hover {
+  color: white;
+  background: transparent;
+}
+
+.tabs .tab.active {
+  color: #a5b4ff;
+  border-bottom-color: #646cff;
+}
+
+/* ==================== Дерево объектов (UserPanel) ==================== */
+.tree-sidebar {
+  min-width: 260px;
+  max-width: 320px;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.4em 0.6em;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tree-item:hover {
+  background: #2a2a2a;
+}
+
+.tree-item.active {
+  background: #646cff33;
+  color: #a5b4ff;
+}
+
+.tree-arrow {
+  width: 1em;
+  flex-shrink: 0;
+  color: #888;
+  user-select: none;
+}
+
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==================== Хлебные крошки ==================== */
+.breadcrumb {
+  margin-bottom: 0.5rem;
+  font-size: 0.9em;
+  color: #888;
+}
+
+.crumb.link {
+  cursor: pointer;
+  color: #a5b4ff;
+}
+
+.crumb.link:hover {
+  text-decoration: underline;
+}
+
+.crumb.current {
+  color: white;
+}
+
+.crumb-sep {
+  color: #555;
+  margin: 0 0.25em;
+}
+
+/* ==================== Карточка объекта ==================== */
+.type-chip {
+  font-size: 0.55em;
+  background: #646cff22;
+  color: #a5b4ff;
+  padding: 0.25em 0.7em;
+  border-radius: 10px;
+  vertical-align: middle;
+  margin-left: 0.5em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hint {
+  color: #888;
+  font-size: 0.95em;
+}
+
+/* ==================== Дочерние объекты ==================== */
+.child-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.child-card {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.child-card:hover {
+  border-color: #646cff;
+}
+
+.child-name {
+  font-weight: 500;
+}
+
+.child-meta {
+  font-size: 0.8em;
+  color: #888;
+  margin-top: 0.25rem;
+}

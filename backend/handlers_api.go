@@ -40,35 +40,43 @@ func groupsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// ---------- Объекты в группе ----------
+// ---------- Объекты ----------
 
 type object struct {
-	ID       int64  `json:"id"`
-	TypeID   int64  `json:"object_type_id"`
-	TypeName string `json:"object_type_name"`
-	Name     string `json:"name"`
-	EarTag   string `json:"ear_tag"`
+	ID         int64  `json:"id"`
+	TypeID     int64  `json:"object_type_id"`
+	TypeName   string `json:"object_type_name"`
+	ParentID   *int64 `json:"parent_id"`
+	ParentName string `json:"parent_name"`
+	Name       string `json:"name"`
+	EarTag     string `json:"ear_tag"`
 }
 
+// objectsHandler — объекты группы (group_id) или всё активное дерево (без group_id).
 func objectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		groupID := r.URL.Query().Get("group_id")
-		if groupID == "" {
-			http.Error(w, `{"error":"group_id required"}`, http.StatusBadRequest)
-			return
-		}
 
-		rows, err := pool.Query(r.Context(), `
-			SELECT o.id, o.object_type_id, ot.name, o.name,
-			       COALESCE(oi.value, '')
+		query := `
+			SELECT o.id, o.object_type_id, ot.name, o.parent_id, COALESCE(p.name, ''),
+			       o.name, COALESCE(oi.value, '')
 			FROM objects o
 			JOIN object_types ot ON ot.id = o.object_type_id
-			JOIN object_groups og ON og.object_id = o.id AND og.group_id = $1
+			LEFT JOIN objects p ON p.id = o.parent_id
 			LEFT JOIN object_identifiers oi ON oi.object_id = o.id AND oi.id_type = 'ear_tag'
-			WHERE o.is_active
-			ORDER BY o.name`, groupID)
+			WHERE o.is_active`
+		var args []interface{}
+
+		// Совместимость со старым API: фильтр по группе через m:n таблицу
+		if groupID != "" {
+			query += ` AND EXISTS (SELECT 1 FROM object_groups og WHERE og.object_id = o.id AND og.group_id = $1)`
+			args = append(args, groupID)
+		}
+		query += ` ORDER BY o.name`
+
+		rows, err := pool.Query(r.Context(), query, args...)
 		if err != nil {
 			http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
 			return
@@ -78,7 +86,7 @@ func objectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		objects := []object{}
 		for rows.Next() {
 			var o object
-			if err := rows.Scan(&o.ID, &o.TypeID, &o.TypeName, &o.Name, &o.EarTag); err != nil {
+			if err := rows.Scan(&o.ID, &o.TypeID, &o.TypeName, &o.ParentID, &o.ParentName, &o.Name, &o.EarTag); err != nil {
 				http.Error(w, `{"error":"scan error"}`, http.StatusInternalServerError)
 				return
 			}
