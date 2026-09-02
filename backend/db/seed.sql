@@ -12,11 +12,22 @@ INSERT INTO group_types (name) VALUES
     ('Отбор животных')
 ON CONFLICT (name) DO NOTHING;
 
+-- Иерархия типов: Организация → Строение → Коровник/Конюшня → Животное → Корова/Лошадь
 INSERT INTO object_types (name, group_flag) VALUES
+    ('Организация', false),
+    ('Строение', false),
     ('Коровник', true),
     ('Животное', false),
-    ('Инвентарь', false)
+    ('Инвентарь', false),
+    ('Конюшня', false),
+    ('Корова', false),
+    ('Лошадь', false)
 ON CONFLICT (name) DO NOTHING;
+
+-- Привязка типов к родителям
+UPDATE object_types SET parent_id = (SELECT id FROM object_types WHERE name = 'Организация') WHERE name = 'Строение' AND parent_id IS NULL;
+UPDATE object_types SET parent_id = (SELECT id FROM object_types WHERE name = 'Строение') WHERE name IN ('Коровник', 'Конюшня') AND parent_id IS NULL;
+UPDATE object_types SET parent_id = (SELECT id FROM object_types WHERE name = 'Животное') WHERE name IN ('Корова', 'Лошадь') AND parent_id IS NULL;
 
 INSERT INTO groups (group_type_id, name) VALUES
     (1, 'Коровник №1'),
@@ -48,6 +59,21 @@ INSERT INTO objects (object_type_id, name)
 SELECT ot.id, g.name FROM object_types ot, groups g
 WHERE ot.name = 'Коровник' AND g.name IN ('Коровник №1', 'Коровник №2')
 ON CONFLICT (object_type_id, name) DO NOTHING;
+
+-- Пример иерархии: организация → строение → коровники
+INSERT INTO objects (object_type_id, name)
+SELECT ot.id, 'ООО Агро' FROM object_types ot WHERE ot.name = 'Организация'
+ON CONFLICT (object_type_id, name) DO NOTHING;
+
+INSERT INTO objects (object_type_id, parent_id, name)
+SELECT ot.id, org.id, 'Главный корпус'
+FROM object_types ot
+CROSS JOIN (SELECT id FROM objects WHERE object_type_id = (SELECT id FROM object_types WHERE name = 'Организация') AND name = 'ООО Агро') org
+WHERE ot.name = 'Строение'
+ON CONFLICT (object_type_id, name) DO NOTHING;
+
+UPDATE objects SET parent_id = (SELECT id FROM objects WHERE name = 'Главный корпус' AND object_type_id = (SELECT id FROM object_types WHERE name = 'Строение'))
+WHERE name IN ('Коровник №1', 'Коровник №2') AND parent_id IS NULL;
 
 -- Животные в коровнике №1
 INSERT INTO objects (object_type_id, name)

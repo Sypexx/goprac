@@ -33,15 +33,19 @@ CREATE TABLE IF NOT EXISTS object_types (
     group_flag  BOOLEAN NOT NULL DEFAULT false
 );
 
--- Единый реестр экземпляров объектов (животные, коровники, инвентарь)
+-- Единый реестр экземпляров объектов (организации, строения, животные, инвентарь)
 CREATE TABLE IF NOT EXISTS objects (
     id              BIGSERIAL PRIMARY KEY,
     object_type_id  BIGINT NOT NULL REFERENCES object_types(id),
+    parent_id       BIGINT REFERENCES objects(id) ON DELETE SET NULL,
     name            TEXT NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (object_type_id, name)
 );
+
+-- Для уже существующих баз (CREATE TABLE IF NOT EXISTS не добавит колонку)
+ALTER TABLE objects ADD COLUMN IF NOT EXISTS parent_id BIGINT REFERENCES objects(id) ON DELETE SET NULL;
 
 -- Идентификаторы объекта: RFID, бирка, чип (у одного объекта их может быть несколько)
 CREATE TABLE IF NOT EXISTS object_identifiers (

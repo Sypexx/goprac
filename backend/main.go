@@ -32,6 +32,7 @@ func main() {
 	mux.Handle("POST /api/sync", authMiddleware(pool)(syncHandler(pool)))
 	mux.Handle("GET /api/object-types", authMiddleware(pool)(objectTypesHandler(pool)))
 	mux.Handle("GET /api/admin/objects", authMiddleware(pool)(requireRole("admin")(adminObjectsHandler(pool))))
+	mux.Handle("POST /api/admin/objects", authMiddleware(pool)(requireRole("admin")(adminObjectsHandler(pool))))
 	mux.Handle("/api/admin/objects/{id}", authMiddleware(pool)(requireRole("admin")(adminObjectHandler(pool))))
 	mux.Handle("GET /api/admin/users", authMiddleware(pool)(requireRole("admin")(adminUsersHandler(pool))))
 	mux.Handle("POST /api/admin/users", authMiddleware(pool)(requireRole("admin")(adminUsersHandler(pool))))

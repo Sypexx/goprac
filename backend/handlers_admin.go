@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,13 +15,15 @@ import (
 // ========== Admin: управление объектами ==========
 
 type adminObject struct {
-	ID        int64     `json:"id"`
-	TypeID    int64     `json:"object_type_id"`
-	TypeName  string    `json:"object_type_name"`
-	Name      string    `json:"name"`
-	EarTag    string    `json:"ear_tag"`
-	IsActive  bool      `json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         int64     `json:"id"`
+	TypeID     int64     `json:"object_type_id"`
+	TypeName   string    `json:"object_type_name"`
+	ParentID   *int64    `json:"parent_id"`
+	ParentName string    `json:"parent_name"`
+	Name       string    `json:"name"`
+	EarTag     string    `json:"ear_tag"`
+	IsActive   bool      `json:"is_active"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 func adminObjectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -30,21 +33,24 @@ func adminObjectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// GET — список всех объектов
 		if r.Method == http.MethodGet {
 			objectTypeID := r.URL.Query().Get("type_id")
-			rows, err := pool.Query(r.Context(), `
-				SELECT o.id, o.object_type_id, ot.name, o.name,
-				       COALESCE(oi.value, ''), o.is_active, o.created_at
+			query := `
+				SELECT o.id, o.object_type_id, ot.name, o.parent_id, COALESCE(p.name, ''),
+				       o.name, COALESCE(oi.value, ''), o.is_active, o.created_at
 				FROM objects o
 				JOIN object_types ot ON ot.id = o.object_type_id
-				LEFT JOIN object_identifiers oi ON oi.object_id = o.id AND oi.id_type = 'ear_tag'
-				`+func() string {
-				if objectTypeID != "" {
-					return "WHERE o.object_type_id = $1"
-				}
-				return ""
-			}()+`
-				ORDER BY o.name`, objectTypeID)
+				LEFT JOIN objects p ON p.id = o.parent_id
+				LEFT JOIN object_identifiers oi ON oi.object_id = o.id AND oi.id_type = 'ear_tag'`
+			var args []interface{}
+			if objectTypeID != "" {
+				query += " WHERE o.object_type_id = $1"
+				args = append(args, objectTypeID)
+			}
+			query += " ORDER BY o.name"
+
+			rows, err := pool.Query(r.Context(), query, args...)
 			if err != nil {
-				http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
+				log.Printf("adminObjects GET error: %v", err)
+				http.Error(w, fmt.Sprintf(`{"error":"db error: %v"}`, err), http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
@@ -52,8 +58,8 @@ func adminObjectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			objects := []adminObject{}
 			for rows.Next() {
 				var o adminObject
-				if err := rows.Scan(&o.ID, &o.TypeID, &o.TypeName, &o.Name,
-					&o.EarTag, &o.IsActive, &o.CreatedAt); err != nil {
+				if err := rows.Scan(&o.ID, &o.TypeID, &o.TypeName, &o.ParentID, &o.ParentName,
+					&o.Name, &o.EarTag, &o.IsActive, &o.CreatedAt); err != nil {
 					http.Error(w, `{"error":"scan error"}`, http.StatusInternalServerError)
 					return
 				}
@@ -66,9 +72,10 @@ func adminObjectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		// POST — создание объекта
 		if r.Method == http.MethodPost {
 			var req struct {
-				TypeID int64  `json:"type_id"`
-				Name   string `json:"name"`
-				EarTag string `json:"ear_tag"`
+				TypeID   int64  `json:"type_id"`
+				ParentID *int64 `json:"parent_id"`
+				Name     string `json:"name"`
+				EarTag   string `json:"ear_tag"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
@@ -87,16 +94,21 @@ func adminObjectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 
-			res, err := pool.Exec(r.Context(), `
-				INSERT INTO objects (object_type_id, name, created_at)
-				VALUES ($1, $2, now())
-				RETURNING id`, req.TypeID, req.Name)
+			// Если указан родитель — проверяем, что он существует
+			if req.ParentID != nil {
+				var parentExists bool
+				pool.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM objects WHERE id = $1)`, *req.ParentID).Scan(&parentExists)
+				if !parentExists {
+					http.Error(w, `{"error":"parent object not found"}`, http.StatusBadRequest)
+					return
+				}
+			}
+
+			id, err := insertObject(r, pool, req.TypeID, req.ParentID, req.Name)
 			if err != nil {
 				http.Error(w, `{"error":"db error: "+err.Error()}`, http.StatusInternalServerError)
 				return
 			}
-
-			id := res.RowsAffected()
 
 			// Если есть бирка — добавляем
 			if req.EarTag != "" {
@@ -113,6 +125,16 @@ func adminObjectsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 	}
+}
+
+// insertObject — создание объекта с опциональным родителем, возвращает ID.
+func insertObject(r *http.Request, pool *pgxpool.Pool, typeID int64, parentID *int64, name string) (int64, error) {
+	var id int64
+	err := pool.QueryRow(r.Context(), `
+		INSERT INTO objects (object_type_id, parent_id, name, created_at)
+		VALUES ($1, $2, $3, now())
+		RETURNING id`, typeID, parentID, name).Scan(&id)
+	return id, err
 }
 
 type objectRequest struct {

@@ -8,9 +8,10 @@ import (
 )
 
 type objectType struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	GroupFlag bool  `json:"group_flag"`
+	ID        int64  `json:"id"`
+	ParentID  *int64 `json:"parent_id"`
+	Name      string `json:"name"`
+	GroupFlag bool   `json:"group_flag"`
 }
 
 func objectTypesHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -18,7 +19,7 @@ func objectTypesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 
 		rows, err := pool.Query(r.Context(), `
-			SELECT id, name, group_flag
+			SELECT id, parent_id, name, group_flag
 			FROM object_types
 			ORDER BY id`)
 		if err != nil {
@@ -30,7 +31,7 @@ func objectTypesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		types := []objectType{}
 		for rows.Next() {
 			var t objectType
-			if err := rows.Scan(&t.ID, &t.Name, &t.GroupFlag); err != nil {
+			if err := rows.Scan(&t.ID, &t.ParentID, &t.Name, &t.GroupFlag); err != nil {
 				http.Error(w, `{"error":"scan error"}`, http.StatusInternalServerError)
 				return
 			}

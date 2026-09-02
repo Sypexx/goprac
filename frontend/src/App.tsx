@@ -58,6 +58,8 @@ interface adminObject {
   id: number
   object_type_id: number
   object_type_name: string
+  parent_id: number | null
+  parent_name: string
   name: string
   ear_tag: string
   is_active: boolean
@@ -208,6 +210,7 @@ function AdminPanel({ user }: { user: User }) {
   const [showMeasureForm, setShowMeasureForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState('')
+  const [newParent, setNewParent] = useState('')
   const [newEarTag, setNewEarTag] = useState('')
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -224,7 +227,7 @@ function AdminPanel({ user }: { user: User }) {
   const loadData = useCallback(async () => {
     try {
       const [objectsRes, typesRes, usersRes, statsRes, measuresRes] = await Promise.all([
-        fetch(`/api/admin/objects${selectedType ? `?type_id=${selectedType}` : ''}`, { headers }),
+        fetch('/api/admin/objects', { headers }),
         fetch('/api/object-types', { headers }),
         fetch('/api/admin/users', { headers }),
         fetch('/api/reports/summary', { headers }),
@@ -245,13 +248,30 @@ function AdminPanel({ user }: { user: User }) {
     } catch {
       setError('Ошибка загрузки данных')
     }
-  }, [headers, selectedType])
+  }, [headers])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Объекты после применения фильтра по типу (на клиенте)
+  const visibleObjects = selectedType
+    ? objects.filter((o) => String(o.object_type_id) === selectedType)
+    : objects
+
+  // Родительский тип выбранного типа (для каскадного выбора)
+  const selectedTypeObj = objectTypes.find((t) => String(t.id) === newType)
+  const parentTypeID = selectedTypeObj?.parent_id ?? null
+  const parentCandidates = parentTypeID
+    ? objects.filter((o) => o.object_type_id === parentTypeID && o.is_active)
+    : []
 
   const handleAddObject = async () => {
     if (!newName || !newType) {
       setError('Заполните имя и тип')
+      return
+    }
+    // Если у типа есть родительский тип — родитель обязателен
+    if (parentTypeID && parentCandidates.length > 0 && !newParent) {
+      setError('Выберите родительский объект')
       return
     }
 
@@ -261,6 +281,7 @@ function AdminPanel({ user }: { user: User }) {
         headers,
         body: JSON.stringify({
           type_id: parseInt(newType),
+          parent_id: newParent ? parseInt(newParent) : null,
           name: newName,
           ear_tag: newEarTag,
         }),
@@ -274,6 +295,7 @@ function AdminPanel({ user }: { user: User }) {
       setNotice(`Объект создан`)
       setNewName('')
       setNewEarTag('')
+      setNewParent('')
       setShowAddForm(false)
       loadData()
     } catch (err: any) {
@@ -428,13 +450,28 @@ function AdminPanel({ user }: { user: User }) {
            <div className="form-row">
              <select
                value={newType}
-               onChange={(e) => setNewType(e.target.value)}
+               onChange={(e) => { setNewType(e.target.value); setNewParent('') }}
              >
                <option value="">Выберите тип</option>
                {objectTypes.map((t) => (
                  <option key={t.id} value={t.id}>{t.name}</option>
                ))}
              </select>
+             {parentTypeID && (
+               <select
+                 value={newParent}
+                 onChange={(e) => setNewParent(e.target.value)}
+               >
+                 <option value="">
+                   {parentCandidates.length > 0
+                     ? `Входит в (${parentCandidates.length > 0 ? objectTypes.find((t) => t.id === parentTypeID)?.name : ''})`
+                     : `Нет объектов типа "${objectTypes.find((t) => t.id === parentTypeID)?.name}" — сначала создайте`}
+                 </option>
+                 {parentCandidates.map((p) => (
+                   <option key={p.id} value={p.id}>{p.name}</option>
+                 ))}
+               </select>
+             )}
              <input
                value={newName}
                onChange={(e) => setNewName(e.target.value)}
@@ -527,16 +564,18 @@ function AdminPanel({ user }: { user: User }) {
           <tr>
             <th>Имя</th>
             <th>Тип</th>
+            <th>Входит в</th>
             <th>Бирка</th>
             <th>Статус</th>
             <th>Действия</th>
           </tr>
         </thead>
         <tbody>
-          {objects.map((o) => (
+          {visibleObjects.map((o) => (
             <tr key={o.id}>
               <td>{o.name}</td>
               <td>{o.object_type_name}</td>
+              <td>{o.parent_name || '—'}</td>
               <td>{o.ear_tag || '—'}</td>
               <td>
                 <span className={`status-badge ${o.is_active ? 'active' : 'inactive'}`}>
