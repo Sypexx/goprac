@@ -30,7 +30,6 @@ interface MeasureValue {
   device_id: string
 }
 
-// Оффлайн-очередь: записи ждут в localStorage, пока не появится связь
 interface QueuedValue {
   client_uuid: string
   measure_id: number
@@ -38,6 +37,12 @@ interface QueuedValue {
   value: number
   measured_at: string
   device_id: string
+}
+
+interface User {
+  username: string
+  role: 'admin' | 'user' | 'zoo'
+  token: string
 }
 
 const QUEUE_KEY = 'offline_queue'
@@ -58,7 +63,91 @@ function genUUID(): string {
   return crypto.randomUUID()
 }
 
-function App() {
+// ==================== Экран логина ====================
+function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Ошибка авторизации')
+      }
+
+      const data = await res.json()
+      const token = res.headers.get('X-Auth-Token') || ''
+
+      onLogin({ username: data.username, role: data.role, token })
+    } catch (err: any) {
+      setError(err.message || 'Не удалось войти')
+    }
+  }
+
+  return (
+    <div className="login-screen">
+      <div className="login-box">
+        <h1>Учёт коровников</h1>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Логин</label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="admin / user / zoo"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Пароль</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </div>
+          {error && <div className="error">{error}</div>}
+          <button type="submit" className="btn btn-primary">Войти</button>
+        </form>
+        <div className="demo-credentials">
+          <p>Тестовые аккаунты:</p>
+          <ul>
+            <li><code>admin</code> / <code>admin123</code></li>
+            <li><code>user</code> / <code>user123</code></li>
+            <li><code>zoo</code> / <code>zoo123</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ==================== Панель администратора ====================
+function AdminPanel({ user }: { user: User }) {
+  return (
+    <div className="panel">
+      <h2>Панель администратора</h2>
+      <p>Добро пожаловать, {user.username}!</p>
+      <p>Здесь будет управление объектами, справочниками и пользователями.</p>
+    </div>
+  )
+}
+
+// ==================== Панель пользователя ====================
+function UserPanel({ user }: { user: User }) {
   const [groups, setGroups] = useState<Group[]>([])
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
@@ -71,6 +160,8 @@ function App() {
   const [queue, setQueue] = useState<QueuedValue[]>(loadQueue())
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+
+  const headers = { 'Content-Type': 'application/json', 'X-Auth-Token': user.token }
 
   // Онлайн/оффлайн статус
   useEffect(() => {
@@ -86,71 +177,67 @@ function App() {
 
   const loadGroups = useCallback(async () => {
     try {
-      const res = await fetch('/api/groups')
+      const res = await fetch('/api/groups', { headers })
       const data = await res.json()
       setGroups(data)
       if (data.length > 0) setSelectedGroup(data[0].id)
     } catch {
       setError('Нет связи с сервером')
     }
-  }, [])
+  }, [headers])
 
   useEffect(() => { loadGroups() }, [loadGroups])
 
-  // Животные выбранной группы
   useEffect(() => {
     if (selectedGroup == null) return
-    fetch(`/api/objects?group_id=${selectedGroup}`)
+    fetch(`/api/objects?group_id=${selectedGroup}`, { headers })
       .then((r) => r.json())
       .then(setAnimals)
       .catch(() => setError('Ошибка загрузки объектов'))
-  }, [selectedGroup])
+  }, [selectedGroup, headers])
 
-  // Показатели для типа объекта
   useEffect(() => {
     if (!selectedAnimal) { setMeasures([]); return }
-    fetch(`/api/measures?object_type_id=${selectedAnimal.object_type_id}`)
+    fetch(`/api/measures?object_type_id=${selectedAnimal.object_type_id}`, { headers })
       .then((r) => r.json())
       .then((data) => {
         setMeasures(data)
         if (data.length > 0) setMeasureId(data[0].id)
       })
       .catch(() => setError('Ошибка загрузки показателей'))
-  }, [selectedAnimal])
+  }, [selectedAnimal, headers])
 
-  // Значения выбранного объекта
   const loadValues = useCallback(async () => {
     if (!selectedAnimal) { setValues([]); return }
     try {
-      const res = await fetch(`/api/measure-values?object_id=${selectedAnimal.id}`)
+      const res = await fetch(`/api/measure-values?object_id=${selectedAnimal.id}`, { headers })
       setValues(await res.json())
     } catch {
-      // оффлайн — просто не обновляем
+      // оффлайн
     }
-  }, [selectedAnimal])
+  }, [selectedAnimal, headers])
 
   useEffect(() => { loadValues() }, [loadValues])
 
-  // Автосинхронизация очереди при появлении сети
   const syncQueue = useCallback(async () => {
     const q = loadQueue()
     if (q.length === 0) return
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Token': user.token },
         body: JSON.stringify({ values: q }),
       })
       if (!res.ok) return
       const result = await res.json()
       saveQueue([])
       setQueue([])
-      setNotice(`Синхронизировано: ${result.inserted} записей${result.skipped ? `, пропущено дублей: ${result.skipped}` : ''}`)
+      setNotice(`Синхронизировано: ${result.inserted} записей`)
       loadValues()
     } catch {
-      // сеть пропала — очередь остаётся
+      // сеть пропала
     }
-  }, [loadValues])
+  }, [headers, loadValues, user.token])
 
   useEffect(() => {
     if (online) syncQueue()
@@ -174,19 +261,18 @@ function App() {
     }
 
     if (!online) {
-      // Оффлайн: кладём в очередь
       const q = [...loadQueue(), entry]
       saveQueue(q)
       setQueue(q)
       setValue('')
-      setNotice('Запись сохранена локально, отправится при появлении сети')
+      setNotice('Запись сохранена локально')
       return
     }
 
     try {
       const res = await fetch('/api/measure-values', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Token': user.token },
         body: JSON.stringify(entry),
       })
       if (!res.ok) throw new Error(`Ошибка ${res.status}`)
@@ -194,17 +280,15 @@ function App() {
       setNotice(null)
       loadValues()
     } catch {
-      // Сервер недоступен — в очередь
       const q = [...loadQueue(), entry]
       saveQueue(q)
       setQueue(q)
-      setNotice('Сервер недоступен, запись в оффлайн-очереди')
+      setNotice('Запись в оффлайн-очереди')
     }
   }
 
   return (
     <div className="layout">
-      {/* Сайдбар: группы */}
       <aside>
         <h2>Группы</h2>
         {groups.map((g) => (
@@ -232,7 +316,6 @@ function App() {
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
 
-        {/* Список животных */}
         {!selectedAnimal && (
           <>
             <h1>Объекты</h1>
@@ -262,7 +345,6 @@ function App() {
           </>
         )}
 
-        {/* Карточка объекта: ввод измерения + история */}
         {selectedAnimal && (
           <>
             <button className="small" onClick={() => setSelectedAnimal(null)}>← Назад</button>
@@ -319,4 +401,63 @@ function App() {
   )
 }
 
+// ==================== Панель зоотехника ====================
+function ZooPanel({ user }: { user: User }) {
+  return (
+    <div className="panel">
+      <h2>Панель зоотехника</h2>
+      <p>Добро пожаловать, {user.username}!</p>
+      <p>Здесь будут отчёты и аналитика.</p>
+    </div>
+  )
+}
+
+// ==================== Основное приложение ====================
+function App() {
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('auth_user')
+    if (saved) {
+      setUser(JSON.parse(saved))
+    }
+  }, [])
+
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser)
+    localStorage.setItem('auth_user', JSON.stringify(loggedInUser))
+  }
+
+  const handleLogout = () => {
+    setUser(null)
+    localStorage.removeItem('auth_user')
+  }
+
+  if (!user) {
+    return <LoginScreen onLogin={handleLogin} />
+  }
+
+  return (
+    <div className="layout-with-header">
+      <header className="header">
+        <div className="header-left">
+          <h1>Учёт коровников</h1>
+        </div>
+        <div className="header-right">
+          <span className="role-badge">{user.role}</span>
+          <span className="username">{user.username}</span>
+          <button className="btn btn-small" onClick={handleLogout}>Выйти</button>
+        </div>
+      </header>
+
+      <main className="main-content">
+        {user.role === 'admin' && <AdminPanel user={user} />}
+        {user.role === 'user' && <UserPanel user={user} />}
+        {user.role === 'zoo' && <ZooPanel user={user} />}
+      </main>
+    </div>
+  )
+}
+
 export default App
+
