@@ -11,7 +11,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-//go:embed schema.sql seed.sql
+//go:embed schema.sql seed.sql comments.sql
 var sqlFS embed.FS
 
 // Connect создаёт пул соединений с PostgreSQL.
@@ -48,7 +48,7 @@ func Migrate(pool *pgxpool.Pool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	for _, f := range []string{"schema.sql", "seed.sql"} {
+	for _, f := range []string{"schema.sql", "seed.sql", "comments.sql"} {
 		sql, err := sqlFS.ReadFile(f)
 		if err != nil {
 			return err
