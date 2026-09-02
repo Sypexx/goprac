@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"embed"
 	"log"
 	"os"
 	"time"
@@ -9,6 +10,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
+
+//go:embed schema.sql seed.sql
+var sqlFS embed.FS
 
 // Connect создаёт пул соединений с PostgreSQL.
 // Строка подключения берётся из переменной окружения DATABASE_URL
@@ -38,19 +42,21 @@ func Connect() *pgxpool.Pool {
 	return pool
 }
 
-// Migrate создаёт таблицы, если их ещё нет.
+// Migrate создаёт таблицы (schema.sql) и наполняет справочники (seed.sql).
+// Файлы идемпотентны — повторный запуск безопасен.
 func Migrate(pool *pgxpool.Pool) error {
-	_, err := pool.Exec(context.Background(), `
-		CREATE TABLE IF NOT EXISTS scans (
-			id          BIGSERIAL PRIMARY KEY,
-			tag_id      TEXT NOT NULL,
-			scanned_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-			device_id   TEXT NOT NULL DEFAULT 'unknown',
-			synced      BOOLEAN NOT NULL DEFAULT false
-		);
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-		CREATE INDEX IF NOT EXISTS idx_scans_tag_id ON scans (tag_id);
-		CREATE INDEX IF NOT EXISTS idx_scans_synced ON scans (synced);
-	`)
-	return err
+	for _, f := range []string{"schema.sql", "seed.sql"} {
+		sql, err := sqlFS.ReadFile(f)
+		if err != nil {
+			return err
+		}
+		if _, err := pool.Exec(ctx, string(sql)); err != nil {
+			return err
+		}
+		log.Printf("Applied %s", f)
+	}
+	return nil
 }

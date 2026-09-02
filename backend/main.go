@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	// Подключение к PostgreSQL (если БД недоступна, приложение упадёт с ошибкой)
+	// Подключение к PostgreSQL
 	pool := db.Connect()
 	defer pool.Close()
 
@@ -18,40 +18,28 @@ func main() {
 		log.Fatalf("failed to migrate: %v", err)
 	}
 
-	// API-роуты
-	http.HandleFunc("/api/hello", helloHandler)
-	http.HandleFunc("/api/health", healthHandler)
-	http.HandleFunc("/api/scans", scansHandler(pool))
-	http.HandleFunc("/api/sync", syncHandler(pool))
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/health", healthHandler)
+	mux.HandleFunc("GET /api/groups", groupsHandler(pool))
+	mux.HandleFunc("GET /api/objects", objectsHandler(pool))
+	mux.HandleFunc("GET /api/measures", measuresHandler(pool))
+	mux.HandleFunc("GET /api/measure-values", measureValuesHandler(pool))
+	mux.HandleFunc("POST /api/measure-values", createMeasureValueHandler(pool))
+	mux.HandleFunc("POST /api/sync", syncHandler(pool))
 
 	// Статика фронтенда
 	distPath := "../frontend/dist"
 	if _, err := os.Stat(distPath); os.IsNotExist(err) {
-		log.Println("Frontend dist не найден. Запусти:")
-		log.Println("  1. cd frontend && npm install && npm run build")
-		log.Println("  2. go run .")
-		log.Println("")
-		log.Println("Или для dev-режима:")
-		log.Println("  1. cd frontend && npm install && npm run dev")
-		log.Println("  2. go run . (отдельный терминал)")
+		log.Println("Frontend dist не найден. Для dev-режима: cd frontend && npm run dev")
 	} else {
-		http.Handle("/", http.FileServer(http.Dir(distPath)))
+		mux.Handle("/", http.FileServer(http.Dir(distPath)))
 	}
 
 	log.Println("Server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Hello from Go!",
-	})
+	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-	})
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

@@ -13,6 +13,14 @@ backend/test
 .vscode/*
 !.vscode/extensions.json
 
+# TypeScript build info
+*.tsbuildinfo
+
+# Временные файлы
+drawio_b64.txt
+diagram.drawio
+schema.svg
+
 # OS
 .DS_Store
 Thumbs.db
