@@ -3,7 +3,7 @@
 INSERT INTO users (name, role) VALUES
     ('Оператор Иван', 'operator'),
     ('Зоотехник Мария', 'zootechnician')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO group_types (name) VALUES
     ('Коровники'),
@@ -15,20 +15,20 @@ INSERT INTO object_types (name, group_flag) VALUES
     ('Коровник', true),
     ('Животное', false),
     ('Инвентарь', false)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO groups (group_type_id, name) VALUES
     (1, 'Коровник №1'),
     (1, 'Коровник №2'),
     (2, 'Склад кормов')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (group_type_id, name) DO NOTHING;
 
 INSERT INTO measures (name, unit, measure_type) VALUES
     ('Температура', '°C', 'instant'),
     ('Влажность', '%', 'instant'),
     ('Вес', 'кг', 'instant'),
     ('Надой', 'л', 'balance')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
 
 -- Показатели коровника
 INSERT INTO measure_to_object_type (measure_id, object_type_id)
@@ -46,14 +46,13 @@ ON CONFLICT DO NOTHING;
 INSERT INTO objects (object_type_id, name)
 SELECT ot.id, g.name FROM object_types ot, groups g
 WHERE ot.name = 'Коровник' AND g.name IN ('Коровник №1', 'Коровник №2')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (object_type_id, name) DO NOTHING;
 
 -- Животные в коровнике №1
-INSERT INTO objects (object_type_id, name) VALUES
-    ((SELECT id FROM object_types WHERE name = 'Животное'), 'Зорька'),
-    ((SELECT id FROM object_types WHERE name = 'Животное'), 'Бурёнка'),
-    ((SELECT id FROM object_types WHERE name = 'Животное'), 'Милка')
-ON CONFLICT DO NOTHING;
+INSERT INTO objects (object_type_id, name)
+SELECT ot.id, x.name FROM object_types ot, (VALUES ('Зорька'), ('Бурёнка'), ('Милка')) AS x(name)
+WHERE ot.name = 'Животное'
+ON CONFLICT (object_type_id, name) DO NOTHING;
 
 INSERT INTO object_groups (object_id, group_id)
 SELECT o.id, g.id FROM objects o, groups g
@@ -63,7 +62,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO object_identifiers (object_id, id_type, value)
 SELECT o.id, 'ear_tag', 'TAG-' || o.name FROM objects o
 WHERE o.name IN ('Зорька', 'Бурёнка', 'Милка')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (id_type, value) DO NOTHING;
 
 -- Тестовые измерения
 INSERT INTO measure_values (client_uuid, measure_id, object_id, value, measured_at, device_id, author_id)

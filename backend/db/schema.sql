@@ -2,9 +2,9 @@
 
 -- Пользователи (кто вводит данные)
 CREATE TABLE IF NOT EXISTS users (
-    id      BIGSERIAL PRIMARY KEY,
-    name    TEXT NOT NULL,
-    role    TEXT NOT NULL DEFAULT 'operator'
+    id    BIGSERIAL PRIMARY KEY,
+    name  TEXT NOT NULL UNIQUE,
+    role  TEXT NOT NULL DEFAULT 'operator'
 );
 
 -- Справочник типов групп: Склады, Коровники, Отбор животных и т.п.
@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS groups (
     id             BIGSERIAL PRIMARY KEY,
     group_type_id  BIGINT NOT NULL REFERENCES group_types(id),
     parent_id      BIGINT REFERENCES groups(id),
-    name           TEXT NOT NULL
+    name           TEXT NOT NULL,
+    UNIQUE (group_type_id, name)
 );
 
 -- Типы объектов: Коровник, Животное, Датчик, Инвентарь...
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS groups (
 CREATE TABLE IF NOT EXISTS object_types (
     id          BIGSERIAL PRIMARY KEY,
     parent_id   BIGINT REFERENCES object_types(id),
-    name        TEXT NOT NULL,
+    name        TEXT NOT NULL UNIQUE,
     group_flag  BOOLEAN NOT NULL DEFAULT false
 );
 
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS objects (
     object_type_id  BIGINT NOT NULL REFERENCES object_types(id),
     name            TEXT NOT NULL,
     is_active       BOOLEAN NOT NULL DEFAULT true,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (object_type_id, name)
 );
 
 -- Идентификаторы объекта: RFID, бирка, чип (у одного объекта их может быть несколько)
@@ -69,7 +71,7 @@ CREATE TABLE IF NOT EXISTS object_history (
 -- measure_type: 'instant' — замена старого значения, 'balance' — накопление (обороты)
 CREATE TABLE IF NOT EXISTS measures (
     id            BIGSERIAL PRIMARY KEY,
-    name          TEXT NOT NULL,
+    name          TEXT NOT NULL UNIQUE,
     data_type     TEXT NOT NULL DEFAULT 'numeric',  -- numeric | text | bool
     unit          TEXT,
     measure_type  TEXT NOT NULL DEFAULT 'instant' CHECK (measure_type IN ('instant', 'balance'))
